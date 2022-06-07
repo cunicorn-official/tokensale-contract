@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.0;
+pragma solidity 0.8.13;
 
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
@@ -86,6 +86,7 @@ contract TokenSale is Initializable, AccessControlUpgradeable, ReentrancyGuardUp
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant FUND_OWNER_ROLE = keccak256("FUND_OWNER_ROLE");
     bytes32 public constant CONFIG_ROLE = keccak256("CONFIG_ROLE");
+    bytes32 public constant WHITELIST_ROLE = keccak256("WHITELIST_ROLE");
 
     // event
     event BuyToken(address indexed buyer, uint256 ethPaid, uint256 tokenReceived, uint256 timestamp);    
@@ -95,8 +96,13 @@ contract TokenSale is Initializable, AccessControlUpgradeable, ReentrancyGuardUp
     event ExtractToken(address indexed receiver, uint256 tokenBuyReceived);    
     event ClaimLockToken(address indexed receiver, uint256 claimableToken, uint256 chunkClaimed);
     event AddClaimLockToken(address indexed receiver, uint256 lockTokenAmount);
-    
+    event AddWhitelistUser(address[] whitelistUsersAddress);
+    event SetSalePeriod(uint48 tokenSaleStartTime, uint48 tokenSaleEndTime);
+    event SetWhitelistPeriod(uint48 whitelistEndTime);
+    event SetLimitTokenReceivePerUser(bool isCheckLimitPerUser, uint256 limitTokenReceivePerUser);
+    event SetPauseSale(bytes32 saleChannel, bool isPauseSale);
 
+    // modifier
     modifier whenTokenSaleCompleted {
         require(block.timestamp > tokenSaleEndTime || tokenRaised >= FUNDING_GOAL, "TOKENSALE: NOT_COMPLETE_YET");
         _;
@@ -136,7 +142,7 @@ contract TokenSale is Initializable, AccessControlUpgradeable, ReentrancyGuardUp
         uint256 _keepRateDecimals,
         EtherBuy memory _etherBuy,
         TokenBuy[] memory _tokenBuys
-    ) public initializer {
+    ) external initializer {
 
         require (
             _tokenSaleStartTime != 0 &&
@@ -185,14 +191,16 @@ contract TokenSale is Initializable, AccessControlUpgradeable, ReentrancyGuardUp
         _setupRole(PAUSER_ROLE, msg.sender);
         _setupRole(FUND_OWNER_ROLE, msg.sender);
         _setupRole(CONFIG_ROLE, msg.sender);
+        _setupRole(WHITELIST_ROLE, msg.sender);
     }
 
     /// @notice Add whitelist user to allow buy in whitelist period
     /// @param _whitelistUsersAddress array of allow address for use in whitelist period
-    function addWhitelistUser(address[] calldata _whitelistUsersAddress) external onlyRole(CONFIG_ROLE) {
+    function addWhitelistUser(address[] calldata _whitelistUsersAddress) external onlyRole(WHITELIST_ROLE) {
         for (uint256 i = 0; i < _whitelistUsersAddress.length; i++) {
             whitelistUsers[_whitelistUsersAddress[i]] = true;
         }
+        emit AddWhitelistUser(_whitelistUsersAddress);
     }
     
     /// @notice Set period of this sale
@@ -206,6 +214,7 @@ contract TokenSale is Initializable, AccessControlUpgradeable, ReentrancyGuardUp
         // set sale period
         tokenSaleStartTime = _tokenSaleStartTime;
         tokenSaleEndTime = _tokenSaleEndTime;
+        emit SetSalePeriod(_tokenSaleStartTime, _tokenSaleEndTime);
     }
 
     /// @notice Set period of whitelist
@@ -217,19 +226,9 @@ contract TokenSale is Initializable, AccessControlUpgradeable, ReentrancyGuardUp
         // set whitelist period
         // if set whitelistEndTime == tokenSaleStartTime mean no whitelist
         whitelistEndTime = _whitelistEndTime;
+        emit SetWhitelistPeriod(whitelistEndTime);
     }
     
-    /// @notice Check if this time in whitelist period or not
-    /// @dev If not have whitelist period will return false at first condition    
-    function isWhitelistPeriod() public view returns (bool) {
-        return whitelistEndTime != tokenSaleStartTime && block.timestamp >= tokenSaleStartTime && block.timestamp <= whitelistEndTime;
-    }
-
-    /// @notice Check if this sale complete
-    function isTokenSaleCompleted() external view returns (bool) {
-        return block.timestamp > tokenSaleEndTime || tokenRaised >= FUNDING_GOAL;
-    }
-
     /// @notice Set token limit per user
     /// @dev If not have token limit just set _isCheckLimitPerUser to false
     /// @param _isCheckLimitPerUser boolean for check this sale have token limit per user
@@ -238,6 +237,7 @@ contract TokenSale is Initializable, AccessControlUpgradeable, ReentrancyGuardUp
         require(_limitTokenReceivePerUser != 0, "TOKENSALE: INPUT_ZERO_AMOUNT");
         limitTokenReceivePerUser = _limitTokenReceivePerUser;
         isCheckLimitPerUser = _isCheckLimitPerUser;
+        emit SetLimitTokenReceivePerUser(_isCheckLimitPerUser, _limitTokenReceivePerUser);
     }
 
     /// @notice Pause sale for channel ether, token and distributor
@@ -256,6 +256,18 @@ contract TokenSale is Initializable, AccessControlUpgradeable, ReentrancyGuardUp
             isPauseSaleWithToken = _isPauseSale;
             isPauseSaleWithDistributor = _isPauseSale;
         }
+        emit SetPauseSale(_saleChannel, _isPauseSale);
+    }
+
+    /// @notice Check if this time in whitelist period or not
+    /// @dev If not have whitelist period will return false at first condition    
+    function isWhitelistPeriod() public view returns (bool) {
+        return whitelistEndTime != tokenSaleStartTime && block.timestamp >= tokenSaleStartTime && block.timestamp <= whitelistEndTime;
+    }
+
+    /// @notice Check if this sale complete
+    function isTokenSaleCompleted() external view returns (bool) {
+        return block.timestamp > tokenSaleEndTime || tokenRaised >= FUNDING_GOAL;
     }
 
     /// @notice Sale with native coin, e.g. ETH on ETHEREUM or BNB on BSC

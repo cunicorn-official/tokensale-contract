@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.2;
+pragma solidity 0.8.13;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
@@ -14,7 +14,7 @@ contract ICOToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, 
 
     uint256 private _cap;
 
-    function initialize(string memory name_, string memory symbol_, uint256 cap_) public initializer {
+    function initialize(string memory name_, string memory symbol_, uint256 cap_) external initializer {
         require(cap_ > 0, "ERC20Capped: cap is 0");
 
         __ERC20_init(name_, symbol_);
@@ -30,11 +30,11 @@ contract ICOToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, 
         _cap = cap_;
     }
 
-    function pause() public onlyRole(PAUSER_ROLE) {
+    function pause() external onlyRole(PAUSER_ROLE) {
         _pause();
     }
 
-    function unpause() public onlyRole(PAUSER_ROLE) {
+    function unpause() external onlyRole(PAUSER_ROLE) {
         _unpause();
     }
 
@@ -42,7 +42,7 @@ contract ICOToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, 
         return _cap;
     }
 
-    function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
+    function mint(address to, uint256 amount) external onlyRole(MINTER_ROLE) {
         require(ERC20Upgradeable.totalSupply() + amount <= cap(), "ERC20Capped: cap exceeded");
         _mint(to, amount);
     }

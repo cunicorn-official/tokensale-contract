@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.0;
+pragma solidity 0.8.13;
 
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
@@ -86,7 +86,7 @@ contract TokenLocker is
         uint48 _secondReleaseTimestamp,
         uint48 _chunkTimeframe,
         IERC20 _token
-    ) public initializer {
+    ) external initializer {
         require(
             address(_token) != address(0) &&
                 _firstReleaseTimestamp <= _secondReleaseTimestamp,
